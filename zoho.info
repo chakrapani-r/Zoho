@@ -1,0 +1,4 @@
+name = Zoho CRM Integration
+description = Provides drupal API to communicate with zoho CRM.
+core = 7.x
+configure = admin/config/services/zoho/settings

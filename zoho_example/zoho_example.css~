@@ -1,0 +1,12 @@
+
+
+
+#lead-form fieldset {
+  width : 300px;
+  margin: 5px;
+  float : left;
+}
+
+#lead-form fieldset input{
+  width : 250px;
+}
