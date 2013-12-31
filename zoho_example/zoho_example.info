@@ -1,0 +1,5 @@
+name = Example module to show how to use Zoho module API
+description = Provides sample code and form to submit and retrieve data from ZOHO CRM using zoho module.
+core = 7.x
+dependencies[] = zoho
+configure = admin/config/zoho/settings

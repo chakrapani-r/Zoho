@@ -1,0 +1,193 @@
+<?php
+
+global $_zoho_fields1, $_zoho_fields2;
+$_zoho_fields1 = array(
+    "Company" => 'company',
+    "First Name" => 'first_name',
+    "Last Name" => 'last_name',
+    "Designation" => 'designation',
+    "Phone" => 'phone',
+    "Mobile" => 'mobile',
+);
+$_zoho_fields2 = array(
+    "Email" => 'email',
+    "Website" => 'website',
+    "Industry" => 'industry',
+    "No of Employees" => 'no_of_employees',
+    "Annual Revenue" => 'annual_revenue',
+    "Skype ID" => 'skype_id',
+);
+function zoho_example_menu() {
+  $items = array();
+  $items['admin/config/services/zoho/leads'] = array(
+      'title' => 'Lead Information Form.',
+      'page callback' => 'drupal_get_form',
+      'page arguments' => array('lead_form'),
+      'access arguments' => array('administer site configuration'),
+      'type' => MENU_LOCAL_TASK,
+      'weight' => -5,
+  );
+  $items['admin/config/services/zoho/getleads'] = array(
+      'title' => 'Get Lead From Zoho.',
+      'page callback' => 'get_lead_data',
+      'access arguments' => array('administer site configuration'),
+      'type' => MENU_LOCAL_TASK,
+      'weight' => -2,
+  );
+  $items['zoho_leads'] = array(
+      'title' => 'Lead Information Form.',
+      'page callback' => 'drupal_get_form',
+      'page arguments' => array('lead_form'),
+      'access arguments' => array('administer site configuration'),
+      'type' => MENU_NORMAL_ITEM,
+      'weight' => -10,
+  );
+  $items['get_leads_ajax'] = array(
+      'title' => 'Get Lead From Zoho.',
+      'page callback' => 'get_leads_ajax',
+      'access arguments' => array('administer site configuration'),
+      'type' => MENU_NORMAL_ITEM,
+      'weight' => -10,
+  );
+
+  return $items;
+}
+
+
+function valid_email($email) {
+  if (!isset($email)) {
+    return FALSE;
+  }
+  if (!preg_match("^[_a-z0-9-]+(\.[_a-z0-9-]+)*@[a-z0-9-]+(\.[a-z0-9-]+)*(\.[a-z]{2,3})$", $email)) {
+    return FALSE;
+  }
+  return TRUE;
+}
+
+function form_validate_email($form, $form_state) {
+  if (!valid_email_address($form_state['values']['email'])) {
+    form_set_error('email', 'Invalid email.');
+  }
+}
+
+function get_lead_data() {
+  return drupal_get_form('get_leads_form');
+}
+
+function get_leads_form($form_state) {
+  drupal_add_js(array('zoho_example_path' => drupal_get_path('module', 'zoho_example')), 'setting');
+  drupal_add_js(drupal_get_path('module', 'zoho_example') . '/zoho_example.js');
+  $form = array();
+  $form['email'] = array(
+    '#type'  => 'textfield',
+    '#title' => t('Email of a Lead to fetch'),
+    '#required' => TRUE,
+    );
+  $form['#validate'][] = 'form_validate_email';
+  $form['submit'] = array(
+    '#type'  => 'submit',
+    '#value' => t('Get Lead Data'),
+    );
+  return $form;
+}
+
+function get_leads_form_submit($form, &$form_state) {
+  if (isset($form_state['values']['email'])) {
+    get_leads($form_state['values']['email']);
+  }
+}
+
+
+/**
+ * .
+ */
+function get_leads($email) {
+  if (!isset($email))
+    return '';
+  //  $email = $form_state['values']['email'];
+  $lead = get_records_zoho('(Email|=|' . $email . ')');
+  $result = '';
+  if (is_array($lead)) {
+    $result = '<strong>Lead Data for Email="<i>' . $email . '</i>":</strong><br/><table>';
+    foreach ($lead as $key => $val) {
+      $result .= '<tr><td>' . $key . '</td><td>' . $val . '</td></tr>';
+    }
+    $result .= '</table>';
+  }
+  else {
+    $result = '<strong>' . $lead . '</strong>';
+  }
+  //drupal_set_message($result);
+  return $result;
+}
+
+function get_leads_ajax() {
+  if (isset($_POST['email'])) {
+    $email = check_plain($_POST['email']);
+    print get_leads($email);
+  }
+  else {
+    print 'Enter Email.';
+  }
+  exit;
+}
+
+function lead_form($form_state) {
+  //  drupal_add_js(drupal_get_path('module', 'zoho_example') . '/zoho_example.js');
+  drupal_add_css(drupal_get_path('module', 'zoho_example') . '/zoho_example.css');
+  $form = array();
+  global $_zoho_fields1, $_zoho_fields2;
+  $form['user'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('User Info')
+    );
+  $form['organization'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Other Details'),
+    '#suffix' => '<div style="clear:both"></div>'
+    );
+  foreach ($_zoho_fields1 as $field => $key) {
+    $form['user'][$key] = array(
+      '#type'  => 'textfield',
+      '#title' => check_plain($field),
+      );
+  }
+  foreach ($_zoho_fields2 as $field => $key) {
+    $form['organization'][$key] = array(
+      '#type'  => 'textfield',
+      '#title' => check_plain($field),
+      );
+  }
+  $form['user']['company']['#required'] = TRUE;
+  $form['user']['last_name']['#required'] = TRUE;
+  $form['organization']['email']['#required'] = TRUE;
+  $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Save Lead')
+    );
+  $form['#validate'][] = 'form_validate_email';
+  return $form;
+}
+
+
+function lead_form_submit($form, &$form_state) {
+  global $_zoho_fields1, $_zoho_fields2;
+  $values = '';
+  foreach ($_zoho_fields1 as $field => $key) {
+    if (isset($form_state['values'][$key])) {
+      $values .= '<FL val="' . $field . '">' . $form_state['values'][$key] . '</FL>';
+    }
+  }
+  foreach ($_zoho_fields2 as $field => $key) {
+    if (isset($form_state['values'][$key])) {
+      $values .= '<FL val="' . $field . '">' . $form_state['values'][$key] . '</FL>';
+    }
+  }
+  $xml ='xmlData=
+    <Leads>
+    <row no="1">' . $values . '</row>
+    </Leads>
+   ';
+  $result = store_data_to_crm('Leads', $xml);
+  drupal_set_message(check_plain($result));
+}

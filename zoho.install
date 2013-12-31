@@ -1,0 +1,16 @@
+<?php
+
+/**
+ * @file
+ * Zoho - Installation file.
+ */
+
+/**
+ * Implements hook_uninstall().
+ */
+function zoho_uninstall() {
+  variable_del('zoho_crm_ticket');
+  variable_del('zoho_crm_apikey');
+  variable_del('zoho_crm_username');
+  variable_del('zoho_crm_pass');
+}
