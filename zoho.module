@@ -129,8 +129,15 @@ function zoho_store_data_to_crm($type, $xml, $update_id = NULL) {
   }
   $response = drupal_http_request($url, array('method' => 'POST', 'data' => $xml, 'headers' => array('Content-Type' => 'application/x-www-form-urlencoded; charset=utf-8')));
 dpm($response);
+  if ($response->code == 200) {
 //  $output = simplexml_load_string($response->data, 'SimpleXMLElement', LIBXML_NOCDATA);
-//dpm($output);
+    //dpm($output);
+  }
+  else {
+    //watchdog
+    return 'Unknown Error Occured.';
+  }
+
 /*
   if (isset($output->result)) {
     if ((string) $output->result->message == 'Record(s) added successfully') {
