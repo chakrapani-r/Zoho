@@ -17,7 +17,7 @@ function zoho_menu() {
     'title' => 'Zoho API Settings',
     'description' => 'Configure the settings for zoho.',
     'page callback' => 'drupal_get_form',
-    'page arguments' => array('zoho_admin_settings'),
+    'page arguments' => array('zoho_admin_settings_form'),
     'access arguments' => array('administer site configuration'),
     'weight' => -10,
   );
@@ -30,50 +30,73 @@ function zoho_menu() {
 }
 
 /**
- * Menu callback for admin/config/zoho.
+ * Menu callback for admin/config/zoho. Admin settings form.
  */
-function zoho_admin_settings() {
+function zoho_admin_settings_form($form, &$form_state) {
   $form = array();
-  $form['zoho_crm_apikey'] = array(
+  $form['zoho_crm_authtoken'] = array(
     '#type' => 'textfield',
-    '#title' => t('zoho API key'),
-    '#default_value' => variable_get('zoho_crm_apikey', ''),
+    '#title' => t('Zoho API Authtoken'),
+    '#default_value' => variable_get('zoho_crm_authtoken', ''),
+    '#description' => t('Enter a Valid API Authtoken. To use an existing Authtoken, login to zoho crm and goto ')
+     . l(t('Existing tokens'), 'https://accounts.zoho.com/u/h#setting/authtoken', array('attributes' => array('target'=>'_blank')))
+     . '<br/>' . t('OR') . '<br/>' . t('Leave this blank and enter your zoho crm username and password in the below fieldset to generate a new Authtoken.')
   );
-  $form['zoho_crm_ticket'] = array(
+
+  $form['zoho_credentials'] = array(
+    '#type'  => 'fieldset',
+    '#title' => t('Generate new Authtoken'),
+    '#collapsible' => TRUE,
+    '#collapsed' => (variable_get('zoho_crm_authtoken', 0)),
+    '#description' => t('Use this only if you need to generate a new Authtoken. And to generate a new token, the above Authtoken field should be empty.') . '<br/><strong>' . t('Username and password are NOT stored anywhere.') . '</strong>'
+  );
+  $form['zoho_credentials']['zoho_crm_username'] = array(
     '#type' => 'textfield',
-    '#title' => t('Zoho API ticket'),
-    '#default_value' => variable_get('zoho_crm_ticket', ''),
+    '#title' => t('Zoho Username/Email'),
   );
-  $form['zoho_crm_username'] = array(
-    '#type' => 'textfield',
-    '#title' => t('Zoho Username'),
-    '#default_value' => variable_get('zoho_crm_username', ''),
-  );
-  $form['zoho_crm_pass'] = array(
+  $form['zoho_credentials']['zoho_crm_pass'] = array(
     '#type' => 'password',
-    '#title' => t('Zoho password'),
+    '#title' => t('Zoho Password'),
   );
-  $form = system_settings_form($form);
+
   $form['#validate'][] = 'zoho_validate_settings';
+  $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Save Settings'),
+  );
   return $form;
 }
 
 /**
- * Validate function form admin esttings form.
+ * Validate function for admin settings form.
  *
  */
 function zoho_validate_settings($form, &$form_state) {
-  $form_state['values']['zoho_crm_pass'] = ($form_state['values']['zoho_crm_pass'] != '') ? $form_state['values']['zoho_crm_pass'] : variable_get('zoho_crm_pass', '');
-  if (($form_state['values']['zoho_crm_ticket'] == '') && (($form_state['values']['zoho_crm_username'] == '') || ($form_state['values']['zoho_crm_pass'] == ''))) {
-    form_set_error('', t('Please fill api ticket or both username & password.'));
+  if (($form_state['values']['zoho_crm_authtoken'] == '') && (($form_state['values']['zoho_crm_username'] == '') || ($form_state['values']['zoho_crm_pass'] == ''))) {
+    form_set_error('', t('Please fill api Authtoken OR both Username & Password to generate a new Authtoken.'));
   }
-  if ($form_state['values']['zoho_crm_apikey'] == '') {
-    form_set_error('zoho_crm_apikey', t('Please fill zoho api key.'));
+}
+
+/**
+ * Submit function for admin settings form.
+ *
+ */
+function zoho_admin_settings_form_submit($form, &$form_state) {
+  // If Authtoken doesn't exist then generate new Authtoken.
+  if (($form_state['values']['zoho_crm_authtoken'] == '') && (($form_state['values']['zoho_crm_username'] != '') && ($form_state['values']['zoho_crm_pass'] != ''))) {
+    $result = _zoho_generate_authtoken($form_state['values']['zoho_crm_username'], $form_state['values']['zoho_crm_pass']);
+    if (isset($result['authtoken'])) {
+      drupal_set_message(t('Successfully generated a new Authtoken : ') . $result['authtoken']);
+    }
+    else {
+      drupal_set_message(t('There was an error: :error.<br/>Please resolve the error and try again.', array(':error' => $result['error'])), 'error');
+    }
   }
-  // If ticket doesnt exist then generate new ticket.
-  if (($form_state['values']['zoho_crm_ticket'] == '') && (($form_state['values']['zoho_crm_username'] != '') && ($form_state['values']['zoho_crm_pass'] != ''))) {
-    $form_state['values']['zoho_crm_ticket'] = _zoho_get_ticket($form_state['values']['zoho_crm_username'], $form_state['values']['zoho_crm_pass']);
+  elseif($form_state['values']['zoho_crm_authtoken'] != '') {
+    //Update the Authtoken from the admin settings form.
+    variable_set('zoho_crm_authtoken', $form_state['values']['zoho_crm_authtoken']);
   }
+dpm($form_state['values']['zoho_crm_authtoken']);
 }
 
 /**
@@ -91,10 +114,13 @@ function zoho_validate_settings($form, &$form_state) {
  *   Returns the status/response message of the request.
  */
 function zoho_store_data_to_crm($type, $xml, $update_id = NULL) {
-  $api_key = variable_get('zoho_crm_apikey', '');
-  $ticket = variable_get('zoho_crm_ticket', FALSE);
-  $ticket = $ticket ? $ticket : _zoho_get_ticket();
-  // Removed attribute isApproval.
+  $ticket = variable_get('zoho_crm_authtoken', FALSE);
+  if(!$ticket) {
+    $link = l(t('Zoho Configurations'), 'admin/config/services/zoho');
+    watchdog('zoho', 'Zoho CRM Authtoken should be configured at :link.', array(':link' => $link), WATCHDOG_ERROR);
+    return 'Zoho API is not configured.';
+  }
+
   if (isset($update_id)) {
     $url = ZOHO_URL . $type . "/updateRecords?id=" . trim($update_id) . "&authtoken=" . trim($ticket) . "&scope=crmapi" . "&newFormat=1";
   }
@@ -102,7 +128,10 @@ function zoho_store_data_to_crm($type, $xml, $update_id = NULL) {
     $url = ZOHO_URL . $type . "/insertRecords?authtoken=" . trim($ticket) . "&scope=crmapi" . "&newFormat=1";
   }
   $response = drupal_http_request($url, array('method' => 'POST', 'data' => $xml, 'headers' => array('Content-Type' => 'application/x-www-form-urlencoded; charset=utf-8')));
-  $output = simplexml_load_string($response->data, 'SimpleXMLElement', LIBXML_NOCDATA);
+dpm($response);
+//  $output = simplexml_load_string($response->data, 'SimpleXMLElement', LIBXML_NOCDATA);
+//dpm($output);
+/*
   if (isset($output->result)) {
     if ((string) $output->result->message == 'Record(s) added successfully') {
       return t('Data added to zoho crm successfully.');
@@ -116,10 +145,11 @@ function zoho_store_data_to_crm($type, $xml, $update_id = NULL) {
     }
   }
   elseif (isset($output->error)) {
+  //TODO: REwrite error handline
     if ($output->error->message == 'Invalid Ticket Id') {
-      _zoho_get_ticket();
+//      _zoho_get_ticket();
       watchdog('zoho', 'Generating New ticket.');
-      zoho_store_data_to_crm($type, $xml, $update_id);
+  //    zoho_store_data_to_crm($type, $xml, $update_id);
     }
     else {
       return t('@error', array('@error' => (string) $output->error->message));
@@ -128,6 +158,8 @@ function zoho_store_data_to_crm($type, $xml, $update_id = NULL) {
   else {
     return t('Unknown Error Occured.');
   }
+*/
+
 }
 
 /**
@@ -137,9 +169,11 @@ function zoho_store_data_to_crm($type, $xml, $update_id = NULL) {
  *   User name of the Zoho crm account
  * @param string $pass
  *   Password for Zoho crm account
+ * @returns array
+ *   Returns an array with authtoken if success and error otherwise.
  */
 function _zoho_get_ticket($username = '', $pass = '') {
-return _zoho_get_authtoken($username, $pass);
+return _zoho_generate_authtoken($username, $pass);
   $username = ($username != '') ? $username : variable_get('zoho_crm_username', '');
   $pass = ($pass != '') ? $pass : variable_get('zoho_crm_pass', '');
   $key = file_get_contents(ZOHO_TICKET_URL . "login?servicename=ZohoCRM&FROM_AGENT=true&LOGIN_ID=" . $username . "&PASSWORD=" . $pass);
@@ -151,26 +185,28 @@ return _zoho_get_authtoken($username, $pass);
 }
 
 /**
- * Regenerates and stores ZOHO Auth Token
+ * Generates a new ZOHO Auth Token and stores in db.
  *
  * @param string $username
  *   User name of the Zoho crm account
  * @param string $pass
  *   Password for Zoho crm account
+ * @returns array
+ *   Returns an array with authtoken if success and error otherwise.
  */
-/*
-@TODO: Two factor authentication to be handled.
-*/
-function _zoho_get_authtoken($username = '', $pass = '') {
-  $username = ($username != '') ? $username : variable_get('zoho_crm_username', '');
-  $pass = ($pass != '') ? $pass : variable_get('zoho_crm_pass', '');
-  $key = file_get_contents(ZOHO_TICKET_URL . "apiauthtoken/nb/create?SCOPE=ZohoCRM/crmapi&EMAIL_ID=" . $username . "&PASSWORD=" . $pass);
-  $key = drupal_substr($key, strpos($key, "AUTHTOKEN="));
-  $key = drupal_substr($key, strpos($key, "=") + 1);
-  $key = drupal_substr($key, 0, strpos($key, "RESULT=") - 1);
-  variable_set('zoho_crm_ticket', $key);
-
-  return $key;
+function _zoho_generate_authtoken($username, $pass) {
+  $result = file_get_contents(ZOHO_TICKET_URL . "apiauthtoken/nb/create?SCOPE=ZohoCRM/crmapi&EMAIL_ID=" . $username . "&PASSWORD=" . $pass);
+  $anArray = explode("\n",$result);
+  $authToken = explode("=",$anArray['2']);
+  $cmp = strcmp($authToken['0'],"AUTHTOKEN");
+  if ($cmp == 0)
+    {
+      variable_set('zoho_crm_authtoken', $authToken['1']);
+      return array('authtoken' => $authToken['1']);
+    }
+  else {
+    return array('error' => $authToken['1']);	
+  }
 }
 
 /**
@@ -192,12 +228,10 @@ function zoho_get_records($search_condition, $type = 'Leads', $select_columns = 
   if (!$search_condition) {
     return t('Please provide valid search condition.');
   }
-  $api_key = variable_get('zoho_crm_apikey', '');
-  $ticket = variable_get('zoho_crm_ticket', FALSE);
+  $ticket = variable_get('zoho_crm_authtoken', FALSE);
   $ticket = $ticket ? $ticket : _zoho_get_ticket();
   $params = '&scope=crmapi&selectColumns=' . urlencode($select_columns) . '&searchCondition=' . urlencode($search_condition);
 
-//  $url = ZOHO_URL . $type . "/getSearchRecords?apikey=" . trim($api_key) . "&ticket=" . trim($ticket) . $params;
 
   $url = ZOHO_URL . $type . "/getSearchRecords?authtoken=" . trim($ticket) . $params;
 
