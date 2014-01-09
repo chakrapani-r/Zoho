@@ -42,7 +42,6 @@ function zoho_admin_settings_form($form, &$form_state) {
      . l(t('Existing tokens'), 'https://accounts.zoho.com/u/h#setting/authtoken', array('attributes' => array('target'=>'_blank')))
      . '<br/>' . t('OR') . '<br/>' . t('Leave this blank and enter your zoho crm username and password in the below fieldset to generate a new Authtoken.')
   );
-
   $form['zoho_credentials'] = array(
     '#type'  => 'fieldset',
     '#title' => t('Generate new Authtoken'),
@@ -58,7 +57,6 @@ function zoho_admin_settings_form($form, &$form_state) {
     '#type' => 'password',
     '#title' => t('Zoho Password'),
   );
-
   $form['#validate'][] = 'zoho_validate_settings';
   $form['submit'] = array(
     '#type' => 'submit',
@@ -99,62 +97,6 @@ function zoho_admin_settings_form_submit($form, &$form_state) {
 }
 
 /**
- * Sending data to zoho crm.
- *
- * @param string $type
- *   Type of records to be added. e.g,'Leads'
- * @param string $xml
- *   The xml data to be stored in zoho crm.
- * @param string $update_id
- *   Optional-the Id of the record to be updated.
- *   If specified Updates the data already present in crm.
- *
- * @returns object
- *   Returns an object with following keys:
- *   success will contain TRUE/FALSE which determines if the request is succesfull or not.
- *   error will contain error code if the request was not successfull.
- *   message will contain success message or error message.
- *   result will contain the xml object of the records inserted if the request is successfull.
- */
-function zoho_store_data_to_crm($type, $xml, $update_id = NULL) {
-  $result = (object)array();
-  $ticket = variable_get('zoho_crm_authtoken', FALSE);
-  if(!$ticket) {
-    $link = l(t('Zoho Configurations'), 'admin/config/services/zoho');
-    watchdog('zoho', 'Zoho CRM Authtoken should be configured at admin > config > services > zoho', array(), WATCHDOG_ERROR, $link);
-      $result->success = FALSE;
-      $result->message = 'Zoho API is not configured.';
-      return $result;
-  }
-  if (isset($update_id)) {
-    $url = ZOHO_URL . $type . "/updateRecords?id=" . trim($update_id) . "&authtoken=" . trim($ticket) . "&scope=crmapi" . "&newFormat=1";
-  }
-  else {
-    $url = ZOHO_URL . $type . "/insertRecords?authtoken=" . trim($ticket) . "&scope=crmapi" . "&newFormat=1";
-  }
-  $response = drupal_http_request($url, array('method' => 'POST', 'data' => $xml, 'headers' => array('Content-Type' => 'application/x-www-form-urlencoded; charset=utf-8')));
-  if ($response->code == 200) {
-    $xml = simplexml_load_string($response->data, 'SimpleXMLElement', LIBXML_NOCDATA);
-    if (isset($xml->result)) {
-      $result->success = TRUE;
-      $result->message = (string)$xml->result->message;
-      $result->result  = $xml->result->recorddetail;
-    } 
-    else if (isset($xml->error)) {
-      $result->success = FALSE;
-      $result->message = (string)$xml->error->message;
-      $result->error  = (string)$xml->error->code;
-    }
-  }
-  else {
-    $result->success = FALSE;
-    $result->error = $response->code;
-    $result->message = $response->error;
-  }
-  return $result;
-}
-
-/**
  * Generates a new ZOHO Auth Token and stores in db.
  *
  * @param string $username
@@ -187,6 +129,67 @@ function _zoho_generate_authtoken($username, $pass) {
 }
 
 /**
+ * Sending data to zoho crm.
+ *
+ * @param string $type
+ *   Type of records to be added. e.g,'Leads'
+ * @param string $xml
+ *   The xml data to be stored in zoho crm.
+ * @param string $update_id
+ *   Optional-the Id of the record to be updated.
+ *   If specified Updates the data already present in crm.
+ *
+ * @returns object
+ *   Returns an object with following keys:
+ *   success will contain TRUE/FALSE which determines if the request is succesfull or not.
+ *   error will contain error code if the request was not successfull.
+ *   message will contain success message or error message.
+ *   records will contain an array with details of the inserted records if the request is successfull.
+ */
+function zoho_store_data_to_crm($type, $xml, $update_id = NULL) {
+  $result = (object)array();
+  $ticket = variable_get('zoho_crm_authtoken', FALSE);
+  if(!$ticket) {
+    $link = l(t('Zoho Configurations'), 'admin/config/services/zoho');
+    watchdog('zoho', 'Zoho CRM Authtoken should be configured at admin > config > services > zoho', array(), WATCHDOG_ERROR, $link);
+      $result->success = FALSE;
+      $result->message = 'Zoho API is not configured.';
+      return $result;
+  }
+  if (isset($update_id)) {
+    $url = ZOHO_URL . $type . "/updateRecords?id=" . trim($update_id) . "&authtoken=" . trim($ticket) . "&scope=crmapi" . "&newFormat=1";
+  }
+  else {
+    $url = ZOHO_URL . $type . "/insertRecords?authtoken=" . trim($ticket) . "&scope=crmapi" . "&newFormat=1";
+  }
+  $response = drupal_http_request($url, array('method' => 'POST', 'data' => $xml, 'headers' => array('Content-Type' => 'application/x-www-form-urlencoded; charset=utf-8')));
+  if ($response->code == 200) {
+    $xml = simplexml_load_string($response->data, 'SimpleXMLElement', LIBXML_NOCDATA);
+    if (isset($xml->result)) {
+      $result->success = TRUE;
+      $result->message = (string)$xml->result->message;
+      $record_details = array();
+      foreach($xml->result->recorddetail->FL as $fl) {
+	$key = (string)$fl['val'];
+        $record_details[$key] = (string)$fl;
+      }
+      $result->records  = $record_details;
+    } 
+    else if (isset($xml->error)) {
+      $result->success = FALSE;
+      $result->message = (string)$xml->error->message;
+      $result->error  = (string)$xml->error->code;
+    }
+  }
+  else {
+    $result->success = FALSE;
+    $result->error = $response->code;
+    $result->message = $response->error;
+  }
+  return $result;
+}
+
+/**
  * Getting data from zoho crm.
  *
  * @param string $search_condition
@@ -198,8 +201,12 @@ function _zoho_generate_authtoken($username, $pass) {
  *   Columns of the records to be fetched.
  *   e.g, 'Leads(First Name,Last Name,Email)'
  *
- * @returns string|array
- *   Value : Error message if error occurs, Otherwise returns an array.
+ * @returns object
+ *   Returns an object with following keys:
+ *   success will contain TRUE/FALSE which determines if the request is succesfull or not.
+ *   error will contain error code if the request was not successfull.
+ *   message will contain success message or error message.
+ *   records will contain an associated array of records with data if the request is successfull.
  */
 function zoho_get_records($search_condition, $type = 'Leads', $select_columns = 'All') {
   $result = (object)array();
@@ -220,13 +227,7 @@ function zoho_get_records($search_condition, $type = 'Leads', $select_columns = 
     if (isset($xml->result)) {
       $result->success = TRUE;
       $result->message = (string)$xml->result->message;
-      $result->result  = $xml->result->recorddetail;
-
-      foreach ($xml->result->$type->row->FL as $fl) {
-	$key = str_replace(array(' '), '_', (string) $fl['val']);
-	$values[$key] = (string) $fl;
-      }
-      $result->result = $values;
+      $result->records = parse_records($xml, $type);
     } 
     else if (isset($xml->error)) {
       $result->success = FALSE;
@@ -240,22 +241,29 @@ function zoho_get_records($search_condition, $type = 'Leads', $select_columns = 
     $result->message = $response->error;
   }
   return $result;
-  /*
-  dpm($response);
-  $output = simplexml_load_string($response->data, 'SimpleXMLElement', LIBXML_NOCDATA);
-  dpm($output);
-  if (isset($output->nodata)) {
-    return t('No data with given parameters.');
-  }
-  elseif (isset($output->result)) {
-    foreach ($output->result->$type->row->FL as $fl) {
-      $key = str_replace(array(' '), '_', (string) $fl['val']);
-      $values[$key] = (string) $fl;
+}
+
+/**
+ * Parse xml object into an array
+ *
+ * @param object $xml
+ *   An object of type simplexmlelement returned by simplexml_load_string().
+ * @param string $type
+ *   Type of records being fetched. e.g,'Leads'
+ *
+ * @returns array
+ *   An associated array of records with fiekds and values.
+ *   $records[row value][field value]
+ */
+function parse_records($xml, $type) {
+  $numberOfRecords = count($xml->result->$type->row);
+  $records = array();
+  for ($i = 0; $i < $numberOfRecords; $i++) {
+    $numberOfValues = count($xml->result->$type->row[$i]->FL);
+    for ($j = 0; $j < $numberOfValues; $j++) {
+      $field = (string) $xml->result->$type->row[$i]->FL[$j]['val'];
+      $records[$i][$field] = (string) $xml->result->$type->row[$i]->FL[$j];
     }
-    return $values;
   }
-  else {
-    return t('@error', array('@error' => (string) $output));
-  }
-  */
+  return $records;
 }
