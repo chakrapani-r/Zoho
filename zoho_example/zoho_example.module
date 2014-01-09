@@ -25,7 +25,7 @@ $_zoho_fields2 = array(
 function zoho_example_menu() {
   $items = array();
   $items['admin/config/services/zoho/leads'] = array(
-      'title' => 'Lead Information Form.',
+      'title' => 'Add Lead to Zoho CRM.',
       'page callback' => 'drupal_get_form',
       'page arguments' => array('lead_form'),
       'access arguments' => array('administer site configuration'),
@@ -117,12 +117,18 @@ function get_leads($email) {
   $response = zoho_get_records('(Email|=|' . $email . ')');
   $result = '';
   if ($response->success) {
-    $lead = $response->result;
-    $result = '<strong>Lead Data for Email="<i>' . $email . '</i>":</strong><br/><table>';
-    foreach ($lead as $key => $val) {
-      $result .= '<tr><td>' . $key . '</td><td>' . $val . '</td></tr>';
+    $leads = $response->records;
+    $result = '<strong>Lead Data for Email="<i>' . $email . '</i>"<br/> No. of Records = ' . count($leads) . '</strong><br/>';
+    $i = 0;
+    foreach ($leads as $lead) {
+      $i++;
+      $result .= '<table>';
+      $result .= '<tr><th>Record</th><th>#' . $i . '</th></tr>';
+      foreach ($lead as $key => $val) {
+	$result .= '<tr><td>' . $key . '</td><td>' . $val . '</td></tr>';
+      }
+      $result .= '</table>';
     }
-    $result .= '</table>';
   }
   else {
     //Error.
