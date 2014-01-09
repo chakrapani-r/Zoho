@@ -2,9 +2,12 @@ Installation Instructions:
 
 1. Copy the zoho module directory into your modules directory.
 
-2. Enable zoho module at: Administer > Site building > Modules
+2. Enable zoho module at: Administer > Modules (admin/modules)
 
-3. Configure Zoho CRM account settings at admin/config/services/zoho
+3. Go to Administer > People > Permissions (admin/people/permissions) 
+   and grant 'Administer zoho api module' permission to the needed user roles.
+
+4. Configure Zoho CRM account settings at admin/config/services/zoho
 
 Usage Instructions:
 
