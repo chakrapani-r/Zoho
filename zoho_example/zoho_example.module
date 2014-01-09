@@ -114,9 +114,10 @@ function get_leads_form_submit($form, &$form_state) {
 function get_leads($email) {
   if (!isset($email))
     return '';
-  $lead = zoho_get_records('(Email|=|' . $email . ')');
+  $response = zoho_get_records('(Email|=|' . $email . ')');
   $result = '';
-  if (is_array($lead)) {
+  if ($response->success) {
+    $lead = $response->result;
     $result = '<strong>Lead Data for Email="<i>' . $email . '</i>":</strong><br/><table>';
     foreach ($lead as $key => $val) {
       $result .= '<tr><td>' . $key . '</td><td>' . $val . '</td></tr>';
@@ -124,7 +125,8 @@ function get_leads($email) {
     $result .= '</table>';
   }
   else {
-    $result = '<strong>' . $lead . '</strong>';
+    //Error.
+    $result = '<strong>' . $response->message . '</strong>';
   }
   return $result;
 }
@@ -197,5 +199,5 @@ function lead_form_submit($form, &$form_state) {
     </Leads>
    ';
   $result = zoho_store_data_to_crm('Leads', $xml);
-  drupal_set_message(check_plain($result));
+  dpm($result);
 }
