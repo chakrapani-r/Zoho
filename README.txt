@@ -15,7 +15,7 @@ To store data from drupal to zoho crm, use
  $type : Type of records to be added. e.g,'Leads'
  $xml  : The xml data to be stored in zoho crm.
     Please check the link below for more information on xml format.
-    https://zohocrmapi.wiki.zoho.com/API-Methods.html
+    https://www.zoho.com/crm/help/api/api-methods.html
  $update_id : Optional-the Id of the record to be updated.
               If specified Updates the data already present in crm.
  Return Value :
