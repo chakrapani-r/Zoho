@@ -96,7 +96,6 @@ function zoho_admin_settings_form_submit($form, &$form_state) {
     //Update the Authtoken from the admin settings form.
     variable_set('zoho_crm_authtoken', $form_state['values']['zoho_crm_authtoken']);
   }
-dpm($form_state['values']['zoho_crm_authtoken']);
 }
 
 /**
@@ -110,17 +109,23 @@ dpm($form_state['values']['zoho_crm_authtoken']);
  *   Optional-the Id of the record to be updated.
  *   If specified Updates the data already present in crm.
  *
- * @returns string
- *   Returns the status/response message of the request.
+ * @returns object
+ *   Returns an object with following keys:
+ *   success will contain TRUE/FALSE which determines if the request is succesfull or not.
+ *   error will contain error code if the request was not successfull.
+ *   message will contain success message or error message.
+ *   result will contain the xml object of the records inserted if the request is successfull.
  */
 function zoho_store_data_to_crm($type, $xml, $update_id = NULL) {
+  $result = (object)array();
   $ticket = variable_get('zoho_crm_authtoken', FALSE);
   if(!$ticket) {
     $link = l(t('Zoho Configurations'), 'admin/config/services/zoho');
-    watchdog('zoho', 'Zoho CRM Authtoken should be configured at :link.', array(':link' => $link), WATCHDOG_ERROR);
-    return 'Zoho API is not configured.';
+    watchdog('zoho', 'Zoho CRM Authtoken should be configured at admin > config > services > zoho', array(), WATCHDOG_ERROR, $link);
+      $result->success = FALSE;
+      $result->message = 'Zoho API is not configured.';
+      return $result;
   }
-
   if (isset($update_id)) {
     $url = ZOHO_URL . $type . "/updateRecords?id=" . trim($update_id) . "&authtoken=" . trim($ticket) . "&scope=crmapi" . "&newFormat=1";
   }
@@ -128,67 +133,25 @@ function zoho_store_data_to_crm($type, $xml, $update_id = NULL) {
     $url = ZOHO_URL . $type . "/insertRecords?authtoken=" . trim($ticket) . "&scope=crmapi" . "&newFormat=1";
   }
   $response = drupal_http_request($url, array('method' => 'POST', 'data' => $xml, 'headers' => array('Content-Type' => 'application/x-www-form-urlencoded; charset=utf-8')));
-dpm($response);
   if ($response->code == 200) {
-//  $output = simplexml_load_string($response->data, 'SimpleXMLElement', LIBXML_NOCDATA);
-    //dpm($output);
-  }
-  else {
-    //watchdog
-    return 'Unknown Error Occured.';
-  }
-
-/*
-  if (isset($output->result)) {
-    if ((string) $output->result->message == 'Record(s) added successfully') {
-      return t('Data added to zoho crm successfully.');
-    }
-    elseif ((string) $output->result->message == 'Record(s) already exists') {
-      // Display the unique key used to verify duplicates.
-      return t('Data with submitted information already Exists.');
-    }
-    else {
-      return t('@response', array('@response' => "Response:" . (string) $output->result->message));
-    }
-  }
-  elseif (isset($output->error)) {
-  //TODO: REwrite error handline
-    if ($output->error->message == 'Invalid Ticket Id') {
-//      _zoho_get_ticket();
-      watchdog('zoho', 'Generating New ticket.');
-  //    zoho_store_data_to_crm($type, $xml, $update_id);
-    }
-    else {
-      return t('@error', array('@error' => (string) $output->error->message));
+    $xml = simplexml_load_string($response->data, 'SimpleXMLElement', LIBXML_NOCDATA);
+    if (isset($xml->result)) {
+      $result->success = TRUE;
+      $result->message = (string)$xml->result->message;
+      $result->result  = $xml->result->recorddetail;
+    } 
+    else if (isset($xml->error)) {
+      $result->success = FALSE;
+      $result->message = (string)$xml->error->message;
+      $result->error  = (string)$xml->error->code;
     }
   }
   else {
-    return t('Unknown Error Occured.');
+    $result->success = FALSE;
+    $result->error = $response->code;
+    $result->message = $response->error;
   }
-*/
-
-}
-
-/**
- * Regenerates and stores ZOHO API Ticket
- *
- * @param string $username
- *   User name of the Zoho crm account
- * @param string $pass
- *   Password for Zoho crm account
- * @returns array
- *   Returns an array with authtoken if success and error otherwise.
- */
-function _zoho_get_ticket($username = '', $pass = '') {
-return _zoho_generate_authtoken($username, $pass);
-  $username = ($username != '') ? $username : variable_get('zoho_crm_username', '');
-  $pass = ($pass != '') ? $pass : variable_get('zoho_crm_pass', '');
-  $key = file_get_contents(ZOHO_TICKET_URL . "login?servicename=ZohoCRM&FROM_AGENT=true&LOGIN_ID=" . $username . "&PASSWORD=" . $pass);
-  $key = drupal_substr($key, strpos($key, "TICKET="));
-  $key = drupal_substr($key, strpos($key, "=") + 1);
-  $key = drupal_substr($key, 0, strpos($key, "RESULT=") - 1);
-  variable_set('zoho_crm_ticket', $key);
-  return $key;
+  return $result;
 }
 
 /**
@@ -202,17 +165,24 @@ return _zoho_generate_authtoken($username, $pass);
  *   Returns an array with authtoken if success and error otherwise.
  */
 function _zoho_generate_authtoken($username, $pass) {
-  $result = file_get_contents(ZOHO_TICKET_URL . "apiauthtoken/nb/create?SCOPE=ZohoCRM/crmapi&EMAIL_ID=" . $username . "&PASSWORD=" . $pass);
-  $anArray = explode("\n",$result);
-  $authToken = explode("=",$anArray['2']);
-  $cmp = strcmp($authToken['0'],"AUTHTOKEN");
-  if ($cmp == 0)
-    {
-      variable_set('zoho_crm_authtoken', $authToken['1']);
-      return array('authtoken' => $authToken['1']);
+  $url = ZOHO_TICKET_URL . "apiauthtoken/nb/create?SCOPE=ZohoCRM/crmapi&EMAIL_ID=" . $username . "&PASSWORD=" . $pass;
+  $response = drupal_http_request($url, array('method' => 'POST', 'headers' => array('Content-Type' => 'application/x-www-form-urlencoded; charset=utf-8')));
+  if($response->code == "200") {
+    $result = $response->data;
+    $anArray = explode("\n",$result);
+    $authToken = explode("=",$anArray['2']);
+    $cmp = strcmp($authToken['0'],"AUTHTOKEN");
+    if ($cmp == 0)
+      {
+	variable_set('zoho_crm_authtoken', $authToken['1']);
+	return array('authtoken' => $authToken['1']);
+      }
+    else {
+      return array('error' => $authToken['1']);	
     }
+  }
   else {
-    return array('error' => $authToken['1']);	
+    return array('error' => $response->error);
   }
 }
 
@@ -232,18 +202,48 @@ function _zoho_generate_authtoken($username, $pass) {
  *   Value : Error message if error occurs, Otherwise returns an array.
  */
 function zoho_get_records($search_condition, $type = 'Leads', $select_columns = 'All') {
-  if (!$search_condition) {
-    return t('Please provide valid search condition.');
-  }
+  $result = (object)array();
   $ticket = variable_get('zoho_crm_authtoken', FALSE);
-  $ticket = $ticket ? $ticket : _zoho_get_ticket();
+  if(!$ticket) {
+    $link = l(t('Zoho Configurations'), 'admin/config/services/zoho');
+    watchdog('zoho', 'Zoho CRM Authtoken should be configured at admin > config > services > zoho', array(), WATCHDOG_ERROR, $link);
+    $result->success = FALSE;
+    $result->message = 'Zoho API is not configured.';
+    return $result;
+  }
+  
   $params = '&scope=crmapi&selectColumns=' . urlencode($select_columns) . '&searchCondition=' . urlencode($search_condition);
-
-
   $url = ZOHO_URL . $type . "/getSearchRecords?authtoken=" . trim($ticket) . $params;
-
   $response = drupal_http_request($url);
+  if ($response->code == 200) {
+    $xml = simplexml_load_string($response->data, 'SimpleXMLElement', LIBXML_NOCDATA);
+    if (isset($xml->result)) {
+      $result->success = TRUE;
+      $result->message = (string)$xml->result->message;
+      $result->result  = $xml->result->recorddetail;
+
+      foreach ($xml->result->$type->row->FL as $fl) {
+	$key = str_replace(array(' '), '_', (string) $fl['val']);
+	$values[$key] = (string) $fl;
+      }
+      $result->result = $values;
+    } 
+    else if (isset($xml->error)) {
+      $result->success = FALSE;
+      $result->message = (string)$xml->error->message;
+      $result->error  = (string)$xml->error->code;
+    }
+  }
+  else {
+    $result->success = FALSE;
+    $result->error = $response->code;
+    $result->message = $response->error;
+  }
+  return $result;
+  /*
+  dpm($response);
   $output = simplexml_load_string($response->data, 'SimpleXMLElement', LIBXML_NOCDATA);
+  dpm($output);
   if (isset($output->nodata)) {
     return t('No data with given parameters.');
   }
@@ -257,4 +257,5 @@ function zoho_get_records($search_condition, $type = 'Leads', $select_columns = 
   else {
     return t('@error', array('@error' => (string) $output));
   }
+  */
 }
