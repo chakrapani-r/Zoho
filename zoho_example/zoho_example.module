@@ -28,14 +28,14 @@ function zoho_example_menu() {
       'title' => 'Add Lead to Zoho CRM.',
       'page callback' => 'drupal_get_form',
       'page arguments' => array('lead_form'),
-      'access arguments' => array('administer site configuration'),
+      'access arguments' => array('administer zoho api'),
       'type' => MENU_LOCAL_TASK,
       'weight' => -5,
   );
   $items['admin/config/services/zoho/getleads'] = array(
       'title' => 'Get Lead From Zoho.',
       'page callback' => 'get_lead_data',
-      'access arguments' => array('administer site configuration'),
+      'access arguments' => array('administer zoho api'),
       'type' => MENU_LOCAL_TASK,
       'weight' => -2,
   );
@@ -43,14 +43,14 @@ function zoho_example_menu() {
       'title' => 'Lead Information Form.',
       'page callback' => 'drupal_get_form',
       'page arguments' => array('lead_form'),
-      'access arguments' => array('administer site configuration'),
+      'access arguments' => array('administer zoho api'),
       'type' => MENU_NORMAL_ITEM,
       'weight' => -10,
   );
   $items['get_leads_ajax'] = array(
       'title' => 'Get Lead From Zoho.',
       'page callback' => 'get_leads_ajax',
-      'access arguments' => array('administer site configuration'),
+      'access arguments' => array('administer zoho api'),
       'type' => MENU_NORMAL_ITEM,
       'weight' => -10,
   );

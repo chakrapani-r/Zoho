@@ -18,7 +18,7 @@ function zoho_menu() {
     'description' => 'Configure the settings for zoho.',
     'page callback' => 'drupal_get_form',
     'page arguments' => array('zoho_admin_settings_form'),
-    'access arguments' => array('administer site configuration'),
+    'access arguments' => array('administer zoho api'),
     'weight' => -10,
   );
   $items['admin/config/services/zoho/settings'] = array(
@@ -266,4 +266,16 @@ function parse_records($xml, $type) {
     }
   }
   return $records;
+}
+
+/**
+ * Implements hook_permission().
+ */
+function zoho_permission() {
+  return array(
+    'administer zoho api' => array(
+      'title' => t('Administer zoho api module'),
+      'description' => t('Perform administration tasks for zoho api module.'),
+    ),
+  );
 }
