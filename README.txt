@@ -4,7 +4,7 @@ Installation Instructions:
 
 2. Enable zoho module at: Administer > Site building > Modules
 
-3. Configure Zoho CRM account settings at admin/config/services/zoho-settings
+3. Configure Zoho CRM account settings at admin/config/services/zoho
 
 Usage Instructions:
 
@@ -18,7 +18,12 @@ To store data from drupal to zoho crm, use
     https://zohocrmapi.wiki.zoho.com/API-Methods.html
  $update_id : Optional-the Id of the record to be updated.
               If specified Updates the data already present in crm.
- Returns Value :Returns the status/response message of the request.
+ Return Value :
+    Returns an object with following keys:
+    success will contain TRUE/FALSE which determines if the request is succesfull or not.
+    error will contain error code if the request was not successfull.
+    message will contain success message or error message.
+    records will contain an array with details of the inserted records if the request is successfull.
 
 To fetch records from zoho crm, use
  get_records_zoho($search_condition, $type = 'Leads', $select_columns = 'All');
@@ -29,7 +34,13 @@ To fetch records from zoho crm, use
  $type : Type of records to be fetched. e.g,'Leads'
  $select_columns = Columns of the records to be fetched.
                    e.g, 'Leads(First Name,Last Name,Email)'
- Returns Value : Error message if error occurs, Otherwise returns an array.
+ Return Value : 
+    Returns an object with following keys:
+    success will contain TRUE/FALSE which determines if the request is succesfull or not.
+    error will contain error code if the request was not successfull.
+    message will contain success message or error message.
+    records will contain an associated array of records with data if the request is successfull.
+
 
 Author:
 Chakrapani Reddivari
