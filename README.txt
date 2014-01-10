@@ -23,10 +23,12 @@ To store data from drupal to zoho crm, use
               If specified Updates the data already present in crm.
  Return Value :
     Returns an object with following keys:
-    success will contain TRUE/FALSE which determines if the request is succesfull or not.
-    error will contain error code if the request was not successfull.
-    message will contain success message or error message.
-    records will contain an array with details of the inserted records if the request is successfull.
+    ->success will contain TRUE/FALSE 
+      which determines if the request is succesfull or not.
+    ->error will contain error code if the request was not successful.
+    ->message will contain success message or error message.
+    ->records will contain an array 
+      with details of the inserted records if the request is successful.
 
 To fetch records from zoho crm, use
  get_records_zoho($search_condition, $type = 'Leads', $select_columns = 'All');
@@ -39,10 +41,12 @@ To fetch records from zoho crm, use
                    e.g, 'Leads(First Name,Last Name,Email)'
  Return Value : 
     Returns an object with following keys:
-    success will contain TRUE/FALSE which determines if the request is succesfull or not.
-    error will contain error code if the request was not successfull.
-    message will contain success message or error message.
-    records will contain an associated array of records with data if the request is successfull.
+    ->success will contain TRUE/FALSE 
+      which determines if the request is succesfull or not.
+    ->error will contain error code if the request was not successful.
+    ->message will contain success message or error message.
+    ->records will contain an associated array of records 
+      with data if the request is successful.
 
 
 Author:
