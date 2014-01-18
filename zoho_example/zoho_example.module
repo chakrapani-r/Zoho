@@ -204,6 +204,6 @@ function lead_form_submit($form, &$form_state) {
     <row no="1">' . $values . '</row>
     </Leads>
    ';
-  $result = zoho_store_data_to_crm('Leads', $xml);
+  $result = zoho_post_records('Leads', $xml);
   dpm($result);
 }
