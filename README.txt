@@ -11,8 +11,8 @@ Installation Instructions:
 
 Usage Instructions:
 
-To store data from drupal to zoho crm, use 
- store_data_to_crm($type, $xml, $update_id = NULL);
+To post data from drupal to zoho crm, use 
+ zoho_post_records($type, $xml, $update_id = NULL);
 
  @params
  $type : Type of records to be added. e.g,'Leads'
@@ -31,7 +31,7 @@ To store data from drupal to zoho crm, use
       with details of the inserted records if the request is successful.
 
 To fetch records from zoho crm, use
- get_records_zoho($search_condition, $type = 'Leads', $select_columns = 'All');
+ zoho_get_records($search_condition, $type = 'Leads', $select_columns = 'All');
 
  @params
  $search_condition : search condition based on which records will be fetched.
