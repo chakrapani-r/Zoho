@@ -34,7 +34,7 @@ function zoho_menu() {
  */
 function zoho_admin_settings_form($form, &$form_state) {
   $form = array();
-  $existing_tokens = l(t('Existing tokens'), 'https://accounts.zoho.com/u/h#setting/authtoken', array('attributes' => array('target' => '_blank')));
+  $existing_tokens = l(t('Existing tokens'), ZOHO_TICKET_URL . 'u/h#setting/authtoken', array('attributes' => array('target' => '_blank')));
   $form['zoho_crm_authtoken'] = array(
     '#type' => 'textfield',
     '#title' => t('Zoho API Authtoken'),
@@ -145,7 +145,7 @@ function _zoho_generate_authtoken($username, $pass) {
  *   message contains success message or error message.
  *   records contain an array with details of the inserted records.
  */
-function zoho_store_data_to_crm($type, $xml, $update_id = NULL) {
+function zoho_post_records($type, $xml, $update_id = NULL) {
   $result = (object) array();
   $ticket = variable_get('zoho_crm_authtoken', FALSE);
   if (!$ticket) {
