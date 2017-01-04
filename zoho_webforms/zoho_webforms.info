@@ -1,0 +1,6 @@
+name = Zoho Webforms
+description = Webform submission to Zoho
+core = 7.x
+configure = admin/config/services/zoho/webforms
+dependencies[] = zoho
+dependencies[] = webform

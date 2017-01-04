@@ -1,0 +1,116 @@
+<?php
+
+/**
+ * Implements hook_menu().
+ */
+function zoho_webforms_menu() {
+  $items = array();
+  $items['admin/config/services/zoho/webforms'] = array(
+    'title'  => 'Zoho Webforms Integration',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('zoho_webforms_admin_settings_form'),
+    'file' => 'zoho_webforms.admin.inc',
+    'access arguments' => array('administer zoho api'),
+    'type'   => MENU_CALLBACK,
+    'weight' => -10,
+  );
+  return $items;
+}
+
+/**
+ * Implements hook_webform_submission_insert().
+ */
+function zoho_webforms_webform_submission_insert($node, $submission) {
+  $zoho_forms = array_keys(array_filter(variable_get('zoho_webforms_form_ids', array())));
+  // is this a form that should post to Zoho?
+  if (in_array($node->nid, $zoho_forms)) {
+    $zoho_module = variable_get('zoho_webforms_module', '');
+    if (!empty($zoho_module)) {
+      // figure out the component field names
+      $components = zoho_webforms_component_lookup($node->nid);
+      // match up the data with the component names
+      $component_data = zoho_webforms_match_components($components, $submission);
+      // create the XML zoho needs
+      $xml = zoho_webforms_make_submission($component_data, $zoho_module);
+      // use the API to post it
+      $result = zoho_post_records($zoho_module, $xml);
+      if (!$result->success) {
+        watchdog('zoho_webforms',
+          'Error submitting to Zoho: :message  (:code)',
+          array(
+            ':message' => $result->message,
+            ':code' => $result->error,
+          ),
+          WATCHDOG_ERROR);
+      }
+    }
+  }
+}
+
+/**
+ * return a key => name array of form components
+ **/
+function zoho_webforms_component_lookup($nid) {
+  $result = db_query('SELECT cid, form_key FROM webform_component WHERE nid = :nid',
+    array(':nid' => $nid));
+  return $result->fetchAllKeyed(0, 1);
+}
+
+/**
+ * return a component key => data array
+ **/
+function zoho_webforms_match_components($components, $submission) {
+  $component_data = array();
+  foreach ($submission->data as $i => $data) {
+    if (isset($components[$i])) {
+      if (is_array($data) && count($data) == 1) {
+        $component_data[$components[$i]] = $data[0];
+      }
+    }
+  }
+  return $component_data;
+}
+
+/**
+ * return a webform => zoho field map
+ **/
+function zoho_webforms_get_map($var) {
+  $map = array();
+  $mapstr = variable_get($var, '');
+  $items = explode("\n", $mapstr);
+  foreach ($items as $item) {
+    $map_items = explode('|', $item);
+    if (is_array($map_items) && count($map_items) == 2) {
+      $map[$map_items[0]] = $map_items[1];
+    }
+  }
+  return $map;
+}
+
+/**
+ * create an XML zoho submission
+ **/
+function zoho_webforms_make_submission($data, $zoho_module) {
+  $map = zoho_webforms_get_map('zoho_webforms_mapping');
+  $fl = '';
+  
+  // other preset fields
+  $other_fields = zoho_webforms_get_map('zoho_webforms_other_fields');
+  foreach ($other_fields as $zoho_key => $val) {
+    $fl .= '<FL val="' . trim($zoho_key) . '">' . trim($val) . '</FL>';
+  }
+  
+  // data from form submission
+  foreach ($data as $webform_key => $val) {
+    if (isset($map[$webform_key])) {
+      $fl .= '<FL val="' . trim($map[$webform_key]) . '">' . trim($val) . '</FL>';
+    }
+  }
+  $xml ='xmlData=
+  
+    <' . $zoho_module . '>
+    <row no="1">' . $fl . '</row>
+    </' . $zoho_module . '>
+   ';
+  return $xml;
+}
